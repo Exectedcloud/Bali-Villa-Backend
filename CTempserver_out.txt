@@ -1,0 +1,125 @@
+Watching for file changes with StatReloader
+Internal Server Error: /api/v1/auth/signup/
+Traceback (most recent call last):
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\django\core\handlers\base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\django\views\generic\base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\rest_framework\views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\rest_framework\views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\rest_framework\views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\.venv\Lib\site-packages\rest_framework\views.py", line 512, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\users\views.py", line 92, in post
+    send_verification_email(user)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\services\email.py", line 86, in send_verification_email
+    return send_email(user.email, 'Welcome to BaliVilla — verify your email', html, text)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\services\email.py", line 37, in send_email
+    print(
+    ~~~~~^
+        f'\n[EMAIL] To: {to}\n[EMAIL] Subject: {subject}\n[EMAIL] Body:\n{plain}\n',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        flush=True,
+        ^^^^^^^^^^^
+    )
+    ^
+  File "C:\Program Files\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 111-114: character maps to <undefined>
+[04/Jun/2026 06:01:35] "POST /api/v1/auth/signup/ HTTP/1.1" 500 121261
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\manage.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:01:28
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\services\email.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:02:28
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\services\email.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:02:38
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\users\views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:02:44
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\users\views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:02:51
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\users\host_views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:02:55
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
+C:\Users\ASUS\Documents\GitHub\BaliVilla\BaliVilla\balivilla-api\users\host_views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 04, 2026 - 06:03:00
+Django version 6.0.5, using settings 'balivilla.settings'
+Starting development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/6.0/howto/deployment/
+Watching for file changes with StatReloader
