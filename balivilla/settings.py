@@ -84,10 +84,15 @@ AUTH_USER_MODEL = 'users.User'
 
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:3001',
+    default='http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
     cast=Csv(),
 )
 CORS_ALLOW_CREDENTIALS = True  # Required for httpOnly cookie auth
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
+    cast=Csv(),
+)
 
 # ── Django REST Framework ─────────────────────────────────────────────────────
 
@@ -97,7 +102,6 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'users.authentication.CookieJWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # kept for admin
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -143,6 +147,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# ── Media files (uploaded images) ─────────────────────────────────────────────
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # ── External services ──────────────────────────────────────────────────────────
 
 DEEPL_API_KEY = config('DEEPL_API_KEY', default='')
@@ -150,6 +158,8 @@ DEEPL_API_KEY = config('DEEPL_API_KEY', default='')
 # ── Resend (transactional email) ───────────────────────────────────────────────
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='BaliVilla <onboarding@resend.dev>')
+# Dev only: redirect ALL outbound emails to this address (Resend sandbox only sends to account owner)
+EMAIL_TEST_OVERRIDE = config('EMAIL_TEST_OVERRIDE', default='')
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 HOST_URL = config('HOST_URL', default='http://localhost:3001')
 

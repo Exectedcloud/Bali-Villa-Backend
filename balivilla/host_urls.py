@@ -2,6 +2,7 @@ from django.urls import path
 from users.host_views import HostSignupView, HostLoginView, HostMeView
 from villas.host_views import (
     HostVillaListView, HostVillaDetailView,
+    HostVillaSubmitView, HostVillaPhotoUploadView, HostVillaPhotoDeleteView, HostVillaVideoUploadView,
     HostCalendarView, HostCalendarBlockView, HostCalendarPriceView,
 )
 from bookings.host_views import (
@@ -19,9 +20,18 @@ urlpatterns = [
     # Listings (spec: /host/listings/)
     path('listings/', HostVillaListView.as_view(), name='host-listing-list'),
     path('listings/<int:pk>/', HostVillaDetailView.as_view(), name='host-listing-detail'),
+    # Listings — submit for review
+    path('listings/<int:pk>/submit/', HostVillaSubmitView.as_view(), name='host-listing-submit'),
+    path('listings/<int:pk>/photos/', HostVillaPhotoUploadView.as_view(), name='host-listing-photos'),
+    path('listings/<int:pk>/photos/<int:photo_pk>/', HostVillaPhotoDeleteView.as_view(), name='host-listing-photo-delete'),
+    path('listings/<int:pk>/video/', HostVillaVideoUploadView.as_view(), name='host-listing-video'),
     # Villas — alias used by host frontend (same views, different URL prefix)
     path('villas/', HostVillaListView.as_view(), name='host-villa-list'),
     path('villas/<int:pk>/', HostVillaDetailView.as_view(), name='host-villa-detail'),
+    path('villas/<int:pk>/submit/', HostVillaSubmitView.as_view(), name='host-villa-submit'),
+    path('villas/<int:pk>/photos/', HostVillaPhotoUploadView.as_view(), name='host-villa-photos'),
+    path('villas/<int:pk>/photos/<int:photo_pk>/', HostVillaPhotoDeleteView.as_view(), name='host-villa-photo-delete'),
+    path('villas/<int:pk>/video/', HostVillaVideoUploadView.as_view(), name='host-villa-video'),
     # Reservations (spec: /host/reservations/)
     path('reservations/', HostBookingListView.as_view(), name='host-reservation-list'),
     path('reservations/<int:pk>/', HostBookingDetailView.as_view(), name='host-reservation-detail'),

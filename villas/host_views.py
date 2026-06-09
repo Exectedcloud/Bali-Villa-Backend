@@ -1,7 +1,10 @@
 import calendar as _cal
 import datetime
+import os
 import uuid
 from decimal import Decimal
+from django.conf import settings
+from django.core.files.storage import default_storage
 from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -75,40 +78,48 @@ class HostVillaListView(APIView):
         if not title_en:
             return Response({'error': 'title is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        base_price_idr = d.get('basePriceIdr')
+        def _clean_money(val):
+            if isinstance(val, str):
+                return val.replace(',', '')
+            return val
+
+        base_price_idr = _clean_money(d.get('basePriceIdr'))
         if not base_price_idr:
             return Response({'error': 'basePriceIdr is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        villa = Villa.objects.create(
-            host=host,
-            slug=_make_slug(title_en),
-            title_en=title_en,
-            title_zh=d.get('titleZh') or '',
-            description_en=d.get('description') or '',
-            description_zh=d.get('descriptionZh') or '',
-            property_type=d.get('propertyType') or Villa.TYPE_VILLA,
-            region=d.get('region') or '',
-            city=d.get('city') or '',
-            address=d.get('address') or '',
-            bedrooms=int(d.get('bedrooms') or 1),
-            beds=int(d.get('beds') or 1),
-            bathrooms=float(d.get('bathrooms') or 1),
-            max_guests=int(d.get('guests') or 2),
-            min_nights=int(d.get('minNights') or 1),
-            max_nights=int(d.get('maxNights') or 30),
-            base_price_idr=int(base_price_idr),
-            base_price_cny=0,
-            cleaning_fee_idr=int(d.get('cleaningFee') or 0),
-            instant_book=bool(d.get('instantBook')),
-            cancellation_policy=d.get('cancellationPolicy') or Villa.POLICY_MODERATE,
-            highlights=d.get('highlights') or [],
-            house_rules=d.get('houseRules') or [],
-            check_in_from=d.get('checkInFrom') or None,
-            check_in_until=d.get('checkInUntil') or None,
-            check_out_by=d.get('checkOut') or None,
-            weekend_premium_pct=int(d.get('weekendPremium') or 0),
-            status=Villa.STATUS_PENDING_REVIEW,
-        )
+        try:
+            villa = Villa.objects.create(
+                host=host,
+                slug=_make_slug(title_en),
+                title_en=title_en,
+                title_zh=d.get('titleZh') or '',
+                description_en=d.get('description') or '',
+                description_zh=d.get('descriptionZh') or '',
+                property_type=d.get('propertyType') or Villa.TYPE_VILLA,
+                region=d.get('region') or '',
+                city=d.get('city') or '',
+                address=d.get('address') or '',
+                bedrooms=int(d.get('bedrooms') or 1),
+                beds=int(d.get('beds') or 1),
+                bathrooms=Decimal(str(d.get('bathrooms') or 1.0)),
+                max_guests=int(d.get('guests') or 2),
+                min_nights=int(d.get('minNights') or 1),
+                max_nights=int(d.get('max_nights') or 30),
+                base_price_idr=Decimal(str(base_price_idr)),
+                base_price_cny=0,
+                cleaning_fee_idr=Decimal(str(_clean_money(d.get('cleaningFee') or 0))),
+                instant_book=bool(d.get('instantBook')),
+                cancellation_policy=d.get('cancellationPolicy') or Villa.POLICY_MODERATE,
+                highlights=d.get('highlights') or [],
+                house_rules=d.get('houseRules') or [],
+                check_in_from=d.get('checkInFrom') or None,
+                check_in_until=d.get('checkInUntil') or None,
+                check_out_by=d.get('checkOut') or None,
+                weekend_premium_pct=int(d.get('weekendPremium') or 0),
+                status=Villa.STATUS_PENDING_REVIEW,
+            )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         photos = d.get('photos') or []
         for i, p in enumerate(photos):
@@ -197,8 +208,25 @@ class HostVillaDetailView(APIView):
         if 'status' in d and d['status'] in (Villa.STATUS_PUBLISHED, Villa.STATUS_PAUSED):
             villa.status = d['status']
             update_fields.append('status')
+
+        # Content fields — clear the opposite language so _auto_translate_villa refills it
+        content_changed = False
+        if 'titleEn' in d and d['titleEn'].strip():
+            villa.title_en = d['titleEn'].strip()
+            villa.title_zh = ''
+            update_fields.extend(['title_en', 'title_zh'])
+            content_changed = True
+        if 'descriptionEn' in d:
+            villa.description_en = d['descriptionEn']
+            villa.description_zh = ''
+            update_fields.extend(['description_en', 'description_zh'])
+            content_changed = True
+
         if update_fields:
-            villa.save(update_fields=update_fields)
+            villa.save(update_fields=list(dict.fromkeys(update_fields)))
+        if content_changed:
+            _auto_translate_villa(villa)
+
         villa.refresh_from_db()
         villa_full = Villa.objects.select_related('host__user').prefetch_related('photos', 'amenities').get(pk=villa.pk)
         return Response({'villa': HostVillaSerializer(villa_full).data})
@@ -365,6 +393,143 @@ class HostCalendarBlockView(APIView):
             villa=villa, date__in=date_objects, status=Availability.STATUS_BLOCKED
         ).delete()
         return Response({'unblocked': deleted})
+
+
+# ─── submit for review ────────────────────────────────────────────────────────
+
+class HostVillaSubmitView(APIView):
+    """POST /host/villas/{id}/submit/ — transition draft → pending_review."""
+    permission_classes = [HasHostRole]
+
+    def post(self, request, pk):
+        host = getattr(request.user, 'host_profile', None)
+        if not host:
+            return Response({'error': 'Not a host account.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            villa = Villa.objects.select_related('host__user').prefetch_related('photos', 'amenities').get(pk=pk, host=host)
+        except Villa.DoesNotExist:
+            return Response({'error': 'Villa not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if villa.status != Villa.STATUS_DRAFT:
+            return Response(
+                {'error': f'Only draft villas can be submitted. Current status: {villa.status}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        villa.status = Villa.STATUS_PENDING_REVIEW
+        villa.save(update_fields=['status'])
+        return Response({'villa': HostVillaSerializer(villa).data})
+
+
+# ─── photo upload ─────────────────────────────────────────────────────────────
+
+class HostVillaPhotoUploadView(APIView):
+    """POST /host/villas/{id}/photos/ — upload a photo for a villa."""
+    permission_classes = [HasHostRole]
+
+    def post(self, request, pk):
+        host = getattr(request.user, 'host_profile', None)
+        if not host:
+            return Response({'error': 'Not a host account.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            villa = Villa.objects.get(pk=pk, host=host)
+        except Villa.DoesNotExist:
+            return Response({'error': 'Villa not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        image = request.FILES.get('image')
+        if not image:
+            return Response({'error': 'image file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not image.content_type.startswith('image/'):
+            return Response({'error': 'File must be an image.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ext = os.path.splitext(image.name)[1].lower() or '.jpg'
+        filename = f'{uuid.uuid4().hex[:16]}{ext}'
+        save_path = default_storage.save(f'villa-photos/{villa.pk}/{filename}', image)
+        url = request.build_absolute_uri(f'{settings.MEDIA_URL}{save_path}')
+
+        existing_count = VillaPhoto.objects.filter(villa=villa).count()
+        order = existing_count  # 0 = first/cover photo
+
+        photo = VillaPhoto.objects.create(
+            villa=villa,
+            url=url,
+            order=order,
+            room_type=request.data.get('roomType', ''),
+        )
+
+        # First photo becomes the cover
+        if order == 0:
+            villa.cover_photo_url = url
+            villa.save(update_fields=['cover_photo_url'])
+
+        return Response({
+            'photo': {
+                'id': photo.id,
+                'url': photo.url,
+                'order': photo.order,
+                'roomType': photo.room_type,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
+class HostVillaVideoUploadView(APIView):
+    """POST /host/villas/{id}/video/ — upload verification video."""
+    permission_classes = [HasHostRole]
+
+    def post(self, request, pk):
+        host = getattr(request.user, 'host_profile', None)
+        if not host:
+            return Response({'error': 'Not a host account.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            villa = Villa.objects.get(pk=pk, host=host)
+        except Villa.DoesNotExist:
+            return Response({'error': 'Villa not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        video = request.FILES.get('video')
+        if not video:
+            return Response({'error': 'video file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check content type for video (allows mp4, mov, quicktime etc.)
+        if not video.content_type.startswith('video/'):
+            return Response({'error': 'File must be a video.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ext = os.path.splitext(video.name)[1].lower() or '.mp4'
+        filename = f'verify-{uuid.uuid4().hex[:12]}{ext}'
+        save_path = default_storage.save(f'villa-videos/{villa.pk}/{filename}', video)
+        url = request.build_absolute_uri(f'{settings.MEDIA_URL}{save_path}')
+
+        villa.video_url = url
+        villa.save(update_fields=['video_url'])
+
+        return Response({'video_url': url}, status=status.HTTP_201_CREATED)
+
+
+class HostVillaPhotoDeleteView(APIView):
+    """DELETE /host/villas/{id}/photos/{photo_pk}/ — remove a photo."""
+    permission_classes = [HasHostRole]
+
+    def delete(self, request, pk, photo_pk):
+        host = getattr(request.user, 'host_profile', None)
+        if not host:
+            return Response({'error': 'Not a host account.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            villa = Villa.objects.get(pk=pk, host=host)
+        except Villa.DoesNotExist:
+            return Response({'error': 'Villa not found.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            photo = VillaPhoto.objects.get(pk=photo_pk, villa=villa)
+        except VillaPhoto.DoesNotExist:
+            return Response({'error': 'Photo not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        was_cover = photo.order == 0
+        photo.delete()
+
+        if was_cover:
+            next_photo = VillaPhoto.objects.filter(villa=villa).order_by('order', 'created_at').first()
+            villa.cover_photo_url = next_photo.url if next_photo else ''
+            villa.save(update_fields=['cover_photo_url'])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class HostCalendarPriceView(APIView):

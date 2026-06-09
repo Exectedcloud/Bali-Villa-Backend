@@ -36,6 +36,7 @@ class VillaSerializer(serializers.ModelSerializer):
     highlights = serializers.JSONField()
     badges = serializers.JSONField(source='tags')
     hostId = serializers.IntegerField(source='host_id')
+    videoUrl = serializers.CharField(source='video_url', read_only=True)
 
     class Meta:
         model = Villa
@@ -43,7 +44,7 @@ class VillaSerializer(serializers.ModelSerializer):
             'id', 'slug', 'status', 'titleEn', 'titleZh', 'location', 'region',
             'bedrooms', 'beds', 'bathrooms', 'maxGuests', 'instantBook',
             'basePriceIdr', 'basePriceCny', 'rating', 'reviewCount',
-            'photos', 'amenities', 'highlights', 'badges', 'hostId',
+            'photos', 'amenities', 'highlights', 'badges', 'hostId', 'videoUrl',
         ]
 
     def get_bathrooms(self, obj):
@@ -53,8 +54,14 @@ class VillaSerializer(serializers.ModelSerializer):
     def get_basePriceIdr(self, obj):
         return int(obj.base_price_idr)
 
+    # Fallback rate used when the Celery FX task hasn't populated base_price_cny yet.
+    # ~2155 IDR per 1 CNY matches the live rate used in seeded data.
+    _IDR_PER_CNY_FALLBACK = 2155
+
     def get_basePriceCny(self, obj):
-        return int(obj.base_price_cny)
+        if obj.base_price_cny and obj.base_price_cny > 0:
+            return int(obj.base_price_cny)
+        return round(int(obj.base_price_idr) / self._IDR_PER_CNY_FALLBACK)
 
     def get_rating(self, obj):
         return float(obj.avg_rating)
@@ -98,6 +105,12 @@ class HostVillaSerializer(VillaDetailSerializer):
 
     def get_cleaningFeeIdr(self, obj):
         return int(obj.cleaning_fee_idr)
+
+    def get_photos(self, obj):
+        return [
+            {'id': p.id, 'url': p.url, 'order': p.order, 'roomType': p.room_type}
+            for p in obj.photos.order_by('order', 'created_at')
+        ]
 
 
 class ReviewSerializer(serializers.ModelSerializer):

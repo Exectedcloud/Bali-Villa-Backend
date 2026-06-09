@@ -86,10 +86,11 @@ class HostSignupView(APIView):
             except Exception:
                 logger.exception('Failed to send verification email to %s', user.email)
 
-            return Response(
-                {'detail': 'Please check your email to verify your account.'},
-                status=status.HTTP_201_CREATED,
-            )
+            resp = {'detail': 'Please check your email to verify your account.'}
+            if settings.DEBUG:
+                verify_url = f"{settings.HOST_URL}/verify-email?uid={user.id}&token={user.email_verification_token}"
+                resp['debug_verify_url'] = verify_url
+            return Response(resp, status=status.HTTP_201_CREATED)
 
 
 class HostLoginView(APIView):

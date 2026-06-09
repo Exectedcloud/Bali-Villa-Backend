@@ -97,10 +97,11 @@ class SignupView(APIView):
         except Exception:
             logger.exception('Failed to send verification email to %s', user.email)
 
-        return Response(
-            {'detail': 'Please check your email to verify your account.'},
-            status=status.HTTP_201_CREATED,
-        )
+        resp = {'detail': 'Please check your email to verify your account.'}
+        if settings.DEBUG:
+            verify_url = f"{settings.FRONTEND_URL}/verify-email?uid={user.id}&token={user.email_verification_token}"
+            resp['debug_verify_url'] = verify_url
+        return Response(resp, status=status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
@@ -186,15 +187,22 @@ class ForgotPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data['email']
+        debug_url = None
         try:
             user = User.objects.get(email=email)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
-            send_password_reset_email(user, uid, token)
+            base_url = settings.HOST_URL if 'host' in (user.roles or []) else settings.FRONTEND_URL
+            send_password_reset_email(user, uid, token, base_url=base_url)
+            if settings.DEBUG:
+                debug_url = f"{base_url}/reset-password?uid={uid}&token={token}"
         except User.DoesNotExist:
             pass  # don't reveal whether the email exists
 
-        return Response({'detail': 'If that email is registered, a reset link has been sent.'})
+        resp = {'detail': 'If that email is registered, a reset link has been sent.'}
+        if settings.DEBUG and debug_url:
+            resp['debug_reset_url'] = debug_url
+        return Response(resp)
 
 
 class ResetPasswordView(APIView):
@@ -299,16 +307,23 @@ class ResendVerificationView(APIView):
 
     def post(self, request):
         email = (request.data.get('email') or '').lower().strip()
+        debug_url = None
         try:
             user = User.objects.get(email=email)
             if not user.email_verified:
                 user.email_verification_token = secrets.token_urlsafe(32)
                 user.save(update_fields=['email_verification_token'])
-                send_verification_email(user)
+                base_url = settings.HOST_URL if 'host' in (user.roles or []) else settings.FRONTEND_URL
+                send_verification_email(user, base_url=base_url)
+                if settings.DEBUG:
+                    debug_url = f"{base_url}/verify-email?uid={user.id}&token={user.email_verification_token}"
         except User.DoesNotExist:
             pass  # don't reveal whether the email exists
 
-        return Response({'detail': 'If that email is registered and unverified, a new link has been sent.'})
+        resp = {'detail': 'If that email is registered and unverified, a new link has been sent.'}
+        if settings.DEBUG and debug_url:
+            resp['debug_verify_url'] = debug_url
+        return Response(resp)
 
 
 # ─── profile / password ───────────────────────────────────────────────────────

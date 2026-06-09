@@ -47,11 +47,18 @@ def send_email(to: str, subject: str, html: str, text: str = None) -> bool:
         logger.warning('RESEND_API_KEY not set — email printed to terminal only')
         return False
 
+    # In development, Resend sandbox only delivers to the account owner's email.
+    # Set EMAIL_TEST_OVERRIDE in .env to redirect ALL emails to that address.
+    override = getattr(settings, 'EMAIL_TEST_OVERRIDE', '') or ''
+    actual_to = override if override else (to if isinstance(to, list) else [to])
+    if override:
+        logger.info('EMAIL_TEST_OVERRIDE active — redirecting email for %s to %s', to, override)
+
     try:
         resend.api_key = settings.RESEND_API_KEY
         params: resend.Emails.SendParams = {
             'from': settings.DEFAULT_FROM_EMAIL,
-            'to': [to] if isinstance(to, str) else to,
+            'to': [actual_to] if isinstance(actual_to, str) else actual_to,
             'subject': subject,
             'html': html,
         }
@@ -90,8 +97,9 @@ def send_verification_email(user, base_url: str = None) -> bool:
 
 # ─── password reset email ─────────────────────────────────────────────────────
 
-def send_password_reset_email(user, uid: str, token: str) -> bool:
-    url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
+def send_password_reset_email(user, uid: str, token: str, base_url: str = None) -> bool:
+    root = base_url or settings.FRONTEND_URL
+    url = f"{root}/reset-password?uid={uid}&token={token}"
     html = _wrap(
         '<h2 style="font-family:Georgia,serif;color:#1A1A1A;margin:0 0 6px">重置您的 BaliVilla 密码</h2>'
         '<p style="font-family:Georgia,serif;color:#767676;font-style:italic;margin:0 0 24px">'

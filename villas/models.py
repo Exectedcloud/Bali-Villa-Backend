@@ -83,6 +83,8 @@ class Villa(models.Model):
         on_delete=models.SET_NULL,
         related_name='verified_villas',
     )
+    video_url = models.URLField(max_length=500, blank=True)
+    rejection_reason = models.TextField(blank=True)
     # Denormalised for listing performance
     avg_rating = models.DecimalField(max_digits=4, decimal_places=2, default=0)
     review_count = models.IntegerField(default=0)
