@@ -14,6 +14,13 @@ from .models import Villa, VillaPhoto, VillaAmenity, Availability
 from .serializers import VillaSerializer
 
 
+def _to_int(value, default=0) -> int:
+    """Parse an integer that may arrive with thousands-separators (e.g. '3,000,000')."""
+    if value is None or value == '':
+        return default
+    return int(str(value).replace(',', '').replace('.', '').strip())
+
+
 def _auto_translate_villa(villa: Villa) -> None:
     """Fill in the missing language for title and description, save if changed."""
     changed = False
@@ -90,15 +97,15 @@ class HostVillaListView(APIView):
             region=d.get('region') or '',
             city=d.get('city') or '',
             address=d.get('address') or '',
-            bedrooms=int(d.get('bedrooms') or 1),
-            beds=int(d.get('beds') or 1),
-            bathrooms=float(d.get('bathrooms') or 1),
-            max_guests=int(d.get('guests') or 2),
-            min_nights=int(d.get('minNights') or 1),
-            max_nights=int(d.get('maxNights') or 30),
-            base_price_idr=int(base_price_idr),
+            bedrooms=_to_int(d.get('bedrooms'), 1),
+            beds=_to_int(d.get('beds'), 1),
+            bathrooms=float(str(d.get('bathrooms') or 1).replace(',', '')),
+            max_guests=_to_int(d.get('guests'), 2),
+            min_nights=_to_int(d.get('minNights'), 1),
+            max_nights=_to_int(d.get('maxNights'), 30),
+            base_price_idr=_to_int(base_price_idr),
             base_price_cny=0,
-            cleaning_fee_idr=int(d.get('cleaningFee') or 0),
+            cleaning_fee_idr=_to_int(d.get('cleaningFee')),
             instant_book=bool(d.get('instantBook')),
             cancellation_policy=d.get('cancellationPolicy') or Villa.POLICY_MODERATE,
             highlights=d.get('highlights') or [],
@@ -106,7 +113,7 @@ class HostVillaListView(APIView):
             check_in_from=d.get('checkInFrom') or None,
             check_in_until=d.get('checkInUntil') or None,
             check_out_by=d.get('checkOut') or None,
-            weekend_premium_pct=int(d.get('weekendPremium') or 0),
+            weekend_premium_pct=_to_int(d.get('weekendPremium')),
             status=Villa.STATUS_PENDING_REVIEW,
         )
 
@@ -179,6 +186,7 @@ class HostVillaDetailView(APIView):
             return err
         d = request.data
         update_fields = []
+        _int_fields = {'base_price_idr', 'cleaning_fee_idr', 'min_nights', 'max_nights', 'weekend_premium_pct'}
         for field, key in [
             ('base_price_idr', 'basePriceIdr'),
             ('cleaning_fee_idr', 'cleaningFee'),
@@ -189,7 +197,7 @@ class HostVillaDetailView(APIView):
             ('instant_book', 'instantBook'),
         ]:
             if key in d:
-                setattr(villa, field, d[key])
+                setattr(villa, field, _to_int(d[key]) if field in _int_fields else d[key])
                 update_fields.append(field)
         if 'houseRules' in d:
             villa.house_rules = d['houseRules']
@@ -202,6 +210,42 @@ class HostVillaDetailView(APIView):
         villa.refresh_from_db()
         villa_full = Villa.objects.select_related('host__user').prefetch_related('photos', 'amenities').get(pk=villa.pk)
         return Response({'villa': VillaSerializer(villa_full).data})
+
+
+class HostVillaSubmitView(APIView):
+    """POST /host/listings/<pk>/submit/ — transition a draft listing to pending_review."""
+    permission_classes = [HasHostRole]
+
+    def post(self, request, pk):
+        host = getattr(request.user, 'host_profile', None)
+        if not host:
+            return Response({'error': 'Not a host account.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            villa = Villa.objects.select_related('host__user').prefetch_related('photos', 'amenities').get(pk=pk, host=host)
+        except Villa.DoesNotExist:
+            return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if villa.status not in (Villa.STATUS_DRAFT, Villa.STATUS_PENDING_REVIEW):
+            return Response(
+                {'error': f'Cannot submit a listing with status "{villa.status}".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        d = request.data
+        if d.get('bankHolder') or d.get('bankName') or d.get('bankAccount'):
+            host.payout_bank = {
+                'account_name': d.get('bankHolder') or '',
+                'bank_name': d.get('bankName') or '',
+                'account_number': d.get('bankAccount') or '',
+                'swift_code': d.get('swiftCode') or '',
+                'payout_currency': d.get('payoutCurrency') or 'IDR',
+            }
+            host.save(update_fields=['payout_bank'])
+
+        villa.status = Villa.STATUS_PENDING_REVIEW
+        villa.save(update_fields=['status'])
+        villa.refresh_from_db()
+        return Response({'villa': VillaSerializer(villa).data})
 
 
 # ─── calendar helpers ─────────────────────────────────────────────────────────

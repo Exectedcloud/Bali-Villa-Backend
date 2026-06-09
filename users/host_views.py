@@ -1,7 +1,10 @@
 import logging
 import secrets
 
+from django.conf import settings
 from django.contrib.auth import get_user_model, authenticate
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 logger = logging.getLogger(__name__)
 from rest_framework import status
@@ -18,6 +21,7 @@ from services.email import send_verification_email
 User = get_user_model()
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class HostSignupView(APIView):
     permission_classes = [AllowAny]
 
@@ -43,8 +47,14 @@ class HostSignupView(APIView):
                 )
             # Existing guest must have verified email before upgrading to host
             if not user.email_verified:
+                user.email_verification_token = secrets.token_urlsafe(32)
+                user.save(update_fields=['email_verification_token'])
+                try:
+                    send_verification_email(user, base_url=settings.HOST_URL)
+                except Exception:
+                    logger.exception('Failed to resend verification email to %s', user.email)
                 return Response(
-                    {'error': 'Please verify your email before signing up as a host.'},
+                    {'error': 'Please verify your email first. We\'ve resent a verification link to your inbox.'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             # Guest → host promotion (email already verified, issue tokens immediately)
@@ -81,7 +91,7 @@ class HostSignupView(APIView):
             user.email_verification_token = secrets.token_urlsafe(32)
             user.save(update_fields=['email_verification_token'])
             try:
-                send_verification_email(user)
+                send_verification_email(user, base_url=settings.HOST_URL)
             except Exception:
                 logger.exception('Failed to send verification email to %s', user.email)
 
@@ -91,6 +101,7 @@ class HostSignupView(APIView):
             )
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class HostLoginView(APIView):
     permission_classes = [AllowAny]
 

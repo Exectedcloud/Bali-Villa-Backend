@@ -1,7 +1,7 @@
 from django.urls import path
 from users.host_views import HostSignupView, HostLoginView, HostMeView
 from villas.host_views import (
-    HostVillaListView, HostVillaDetailView,
+    HostVillaListView, HostVillaDetailView, HostVillaSubmitView,
     HostCalendarView, HostCalendarBlockView, HostCalendarPriceView,
 )
 from bookings.host_views import (
@@ -19,6 +19,7 @@ urlpatterns = [
     # Listings (spec: /host/listings/)
     path('listings/', HostVillaListView.as_view(), name='host-listing-list'),
     path('listings/<int:pk>/', HostVillaDetailView.as_view(), name='host-listing-detail'),
+    path('listings/<int:pk>/submit/', HostVillaSubmitView.as_view(), name='host-listing-submit'),
     # Reservations (spec: /host/reservations/)
     path('reservations/', HostBookingListView.as_view(), name='host-reservation-list'),
     path('reservations/<int:pk>/', HostBookingDetailView.as_view(), name='host-reservation-detail'),

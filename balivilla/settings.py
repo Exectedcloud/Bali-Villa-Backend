@@ -40,7 +40,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    'balivilla.middleware.CustomCsrfMiddleware',  # Custom CSRF that exempts /api/
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -89,6 +89,17 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = True  # Required for httpOnly cookie auth
 
+# ── CSRF ──────────────────────────────────────────────────────────────────────
+
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:3000,http://localhost:3001',
+    cast=Csv(),
+)
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = False  # Must be False so JavaScript can read it
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 # ── Django REST Framework ─────────────────────────────────────────────────────
 
 REST_FRAMEWORK = {
@@ -97,7 +108,6 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'users.authentication.CookieJWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # kept for admin
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -151,6 +161,7 @@ DEEPL_API_KEY = config('DEEPL_API_KEY', default='')
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='BaliVilla <onboarding@resend.dev>')
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+HOST_URL = config('HOST_URL', default='http://localhost:3001')
 
 # Console backend as fallback — send_email() always prints to terminal regardless
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

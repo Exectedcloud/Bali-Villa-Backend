@@ -66,11 +66,9 @@ def send_email(to: str, subject: str, html: str, text: str = None) -> bool:
 
 # ─── verification email ───────────────────────────────────────────────────────
 
-def send_verification_email(user) -> bool:
-    url = (
-        f"{settings.FRONTEND_URL}/verify-email"
-        f"?uid={user.id}&token={user.email_verification_token}"
-    )
+def send_verification_email(user, base_url: str = None) -> bool:
+    base = base_url or settings.FRONTEND_URL
+    url = f"{base}/verify-email?uid={user.id}&token={user.email_verification_token}"
     html = _wrap(
         '<h2 style="font-family:Georgia,serif;color:#1A1A1A;margin:0 0 6px">欢迎来到 BaliVilla</h2>'
         '<p style="font-family:Georgia,serif;color:#767676;font-style:italic;margin:0 0 24px">'

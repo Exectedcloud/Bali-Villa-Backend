@@ -1,0 +1,13 @@
+[project]
+name = "bali-villa-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "deepl>=1.18",
+    "django>=5.0,<6.0",
+    "django-cors-headers>=4.3",
+    "djangorestframework>=3.15",
+    "djangorestframework-simplejwt>=5.3",
+    "python-decouple>=3.8",
+    "resend>=2.0.0",
+]

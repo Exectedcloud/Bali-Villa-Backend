@@ -2,6 +2,8 @@ import logging
 import secrets
 
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 logger = logging.getLogger(__name__)
 from django.contrib.auth import authenticate, get_user_model
@@ -69,6 +71,7 @@ def _tokens_for_user(user):
 
 # ─── auth views ───────────────────────────────────────────────────────────────
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SignupView(APIView):
     permission_classes = [AllowAny]
 
@@ -103,6 +106,7 @@ class SignupView(APIView):
         )
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -228,6 +232,7 @@ class ResetPasswordView(APIView):
 
 # ─── not-yet-implemented stubs ────────────────────────────────────────────────
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginPhoneView(APIView):
     permission_classes = [AllowAny]
 
@@ -238,6 +243,7 @@ class LoginPhoneView(APIView):
         )
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginWechatView(APIView):
     permission_classes = [AllowAny]
 
