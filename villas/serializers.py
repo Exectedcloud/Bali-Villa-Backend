@@ -78,6 +78,28 @@ class VillaDetailSerializer(VillaSerializer):
         return HostBriefSerializer(obj.host).data
 
 
+class HostVillaSerializer(VillaDetailSerializer):
+    """
+    VillaDetailSerializer plus host-private fields needed by the listing edit page.
+    Not exposed on public villa endpoints.
+    """
+    cleaningFeeIdr = serializers.SerializerMethodField()
+    weekendPremiumPct = serializers.IntegerField(source='weekend_premium_pct')
+    minNights = serializers.IntegerField(source='min_nights')
+    maxNights = serializers.IntegerField(source='max_nights')
+    cancellationPolicy = serializers.CharField(source='cancellation_policy')
+    houseRules = serializers.JSONField(source='house_rules')
+
+    class Meta(VillaDetailSerializer.Meta):
+        fields = VillaDetailSerializer.Meta.fields + [
+            'cleaningFeeIdr', 'weekendPremiumPct', 'minNights', 'maxNights',
+            'cancellationPolicy', 'houseRules',
+        ]
+
+    def get_cleaningFeeIdr(self, obj):
+        return int(obj.cleaning_fee_idr)
+
+
 class ReviewSerializer(serializers.ModelSerializer):
     villaId = serializers.IntegerField(source='villa_id')
     guestName = serializers.SerializerMethodField()

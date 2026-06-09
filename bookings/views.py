@@ -14,6 +14,10 @@ from reviews.models import Review
 from payments.models import Payment
 from services.translation import translate
 
+# 12% of the guest's subtotal is retained as platform revenue;
+# the host receives the remaining 88%.
+PLATFORM_COMMISSION_RATE = Decimal('0.12')
+
 
 class DraftBookingView(APIView):
     permission_classes = [IsAuthenticated]
@@ -68,7 +72,7 @@ class DraftBookingView(APIView):
             total_idr=subtotal_idr + payment_fee_idr,
             base_price_cny=subtotal_cny,
             total_cny=subtotal_cny + payment_fee_cny,
-            payout_idr=subtotal_idr * Decimal('0.86'),
+            payout_idr=subtotal_idr * (1 - PLATFORM_COMMISSION_RATE),
             status=Booking.STATUS_DRAFT,
             guest_note=data.get('guestNote', ''),
         )
@@ -82,7 +86,7 @@ class BookingListView(APIView):
         qs = (
             Booking.objects
             .filter(guest=request.user)
-            .select_related('villa__host__user')
+            .select_related('villa__host__user', 'review')
             .prefetch_related('villa__photos', 'payments')
         )
         status_filter = request.query_params.get('status')
@@ -98,7 +102,7 @@ class BookingDetailView(APIView):
         try:
             booking = (
                 Booking.objects
-                .select_related('villa__host__user')
+                .select_related('villa__host__user', 'review')
                 .prefetch_related('villa__photos', 'payments')
                 .get(pk=pk, guest=request.user)
             )
@@ -230,7 +234,7 @@ class BookingConfirmView(APIView):
         try:
             booking = (
                 Booking.objects
-                .select_related('villa__host__user')
+                .select_related('villa__host__user', 'review')
                 .prefetch_related('villa__photos', 'payments')
                 .get(pk=pk, guest=request.user)
             )
@@ -385,7 +389,7 @@ class BookingModifyView(APIView):
         booking.total_idr = total_idr
         booking.base_price_cny = total_cny
         booking.total_cny = total_cny
-        booking.payout_idr = total_idr * Decimal('0.86')
+        booking.payout_idr = total_idr * (1 - PLATFORM_COMMISSION_RATE)
         booking.save()
 
         booking_full = (

@@ -12,12 +12,13 @@ class UserSerializer(serializers.ModelSerializer):
     avatarUrl = serializers.SerializerMethodField()
     kycStatus = serializers.CharField(source='kyc_status', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    preferredLanguage = serializers.CharField(source='preferred_language', read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'firstName', 'lastName', 'phone',
-            'avatarUrl', 'locale', 'roles', 'kycStatus', 'createdAt',
+            'avatarUrl', 'locale', 'preferredLanguage', 'roles', 'kycStatus', 'createdAt',
         ]
 
     def get_avatarUrl(self, obj):
@@ -85,10 +86,15 @@ class LoginSerializer(serializers.Serializer):
 class UpdateProfileSerializer(serializers.ModelSerializer):
     firstName = serializers.CharField(source='first_name', max_length=100, required=False)
     lastName = serializers.CharField(source='last_name', max_length=100, required=False)
+    preferredLanguage = serializers.ChoiceField(
+        source='preferred_language',
+        choices=['zh', 'en', 'id'],
+        required=False,
+    )
 
     class Meta:
         model = User
-        fields = ['firstName', 'lastName', 'phone', 'locale']
+        fields = ['firstName', 'lastName', 'phone', 'locale', 'preferredLanguage']
 
     def validate_phone(self, value: str):
         if not value:

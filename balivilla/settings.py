@@ -151,6 +151,7 @@ DEEPL_API_KEY = config('DEEPL_API_KEY', default='')
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='BaliVilla <onboarding@resend.dev>')
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+HOST_URL = config('HOST_URL', default='http://localhost:3001')
 
 # Console backend as fallback — send_email() always prints to terminal regardless
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

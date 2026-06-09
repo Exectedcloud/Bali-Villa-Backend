@@ -8,7 +8,7 @@ from users.models import HostProfile
 from users.permissions import HasHostRole
 from .models import Conversation, Message
 from .serializers import MessageSerializer
-from .views import _translate_with_confidence
+from .views import _translate_with_confidence, _translate_all_with_confidence
 
 
 class HostConversationSerializer(serializers.ModelSerializer):
@@ -95,7 +95,10 @@ class HostMessageListView(APIView):
 
         messages = Message.objects.filter(conversation=conv)
         return Response({
-            'messages': MessageSerializer(messages, many=True, context={'conversation': conv}).data
+            'messages': MessageSerializer(
+                messages, many=True,
+                context={'conversation': conv, 'request': request},
+            ).data
         })
 
     def post(self, request, pk):
@@ -107,21 +110,23 @@ class HostMessageListView(APIView):
         if not text:
             return Response({'error': 'text is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        lang = request.data.get('lang', 'en')
-        if lang not in ('zh', 'en'):
+        lang = request.data.get('lang') or getattr(request.user, 'preferred_language', None) or 'en'
+        if lang not in ('zh', 'en', 'id'):
             lang = 'en'
 
-        target_lang = 'EN-US' if lang == 'zh' else 'ZH'
-        translated_lang = 'en' if lang == 'zh' else 'zh'
-        body_translated, confidence = _translate_with_confidence(text, target_lang)
+        translations, confidence = _translate_all_with_confidence(text, lang)
+        # Mirror primary translation into legacy field (zh for en/id senders, en for zh senders)
+        legacy_lang = 'zh' if lang == 'en' else 'en'
+        body_translated = translations.get(legacy_lang, '')
 
         msg = Message.objects.create(
             conversation=conv,
             sender=request.user,
             body_original=text,
             body_original_lang=lang,
+            translations=translations,
             body_translated=body_translated,
-            body_translated_lang=translated_lang,
+            body_translated_lang=legacy_lang if body_translated else '',
             translation_confidence=confidence,
         )
 
@@ -131,6 +136,6 @@ class HostMessageListView(APIView):
         conv.save(update_fields=['last_message_preview', 'last_message_at', 'guest_unread_count'])
 
         return Response(
-            {'message': MessageSerializer(msg, context={'conversation': conv}).data},
+            {'message': MessageSerializer(msg, context={'conversation': conv, 'request': request}).data},
             status=status.HTTP_201_CREATED,
         )

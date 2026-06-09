@@ -4,19 +4,29 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from services.translation import translate
+from services.translation import translate, translate_to_all
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from villas.models import Villa
 
 
 def _translate_with_confidence(text: str, target_lang: str) -> tuple:
-    """Returns (translated_text, confidence). confidence=0.950 on success, None on failure."""
+    """Legacy helper — kept for any external callers. Returns (translated_text, confidence)."""
     if not text or not text.strip():
         return '', None
     translated = translate(text, target_lang)
     confidence = Decimal('0.950') if translated and translated != text else None
     return translated, confidence
+
+
+def _translate_all_with_confidence(text: str, source_lang: str) -> tuple:
+    """Translate to all languages. Returns (translations_dict, confidence)."""
+    if not text or not text.strip():
+        return {}, None
+    translations = translate_to_all(text, source_lang)
+    any_translated = any(v and k != source_lang for k, v in translations.items())
+    confidence = Decimal('0.950') if any_translated else None
+    return translations, confidence
 
 
 class ConversationListView(APIView):
@@ -87,7 +97,10 @@ class MessageListView(APIView):
 
         messages = Message.objects.filter(conversation=conv)
         return Response({
-            'messages': MessageSerializer(messages, many=True, context={'conversation': conv}).data
+            'messages': MessageSerializer(
+                messages, many=True,
+                context={'conversation': conv, 'request': request},
+            ).data
         })
 
     def post(self, request, pk):
@@ -99,21 +112,23 @@ class MessageListView(APIView):
         if not text:
             return Response({'error': 'text is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        lang = request.data.get('lang', request.user.locale or 'zh')
-        if lang not in ('zh', 'en'):
+        lang = request.data.get('lang') or getattr(request.user, 'preferred_language', None) or request.user.locale or 'zh'
+        if lang not in ('zh', 'en', 'id'):
             lang = 'zh'
 
-        target_lang = 'EN-US' if lang == 'zh' else 'ZH'
-        translated_lang = 'en' if lang == 'zh' else 'zh'
-        body_translated, confidence = _translate_with_confidence(text, target_lang)
+        translations, confidence = _translate_all_with_confidence(text, lang)
+        # Mirror primary translation into legacy field (en for zh/id senders, zh for en senders)
+        legacy_lang = 'zh' if lang == 'en' else 'en'
+        body_translated = translations.get(legacy_lang, '')
 
         msg = Message.objects.create(
             conversation=conv,
             sender=request.user,
             body_original=text,
             body_original_lang=lang,
+            translations=translations,
             body_translated=body_translated,
-            body_translated_lang=translated_lang,
+            body_translated_lang=legacy_lang if body_translated else '',
             translation_confidence=confidence,
         )
 
@@ -123,7 +138,7 @@ class MessageListView(APIView):
         conv.save(update_fields=['last_message_preview', 'last_message_at', 'host_unread_count'])
 
         return Response(
-            {'message': MessageSerializer(msg, context={'conversation': conv}).data},
+            {'message': MessageSerializer(msg, context={'conversation': conv, 'request': request}).data},
             status=status.HTTP_201_CREATED,
         )
 

@@ -19,6 +19,9 @@ urlpatterns = [
     # Listings (spec: /host/listings/)
     path('listings/', HostVillaListView.as_view(), name='host-listing-list'),
     path('listings/<int:pk>/', HostVillaDetailView.as_view(), name='host-listing-detail'),
+    # Villas — alias used by host frontend (same views, different URL prefix)
+    path('villas/', HostVillaListView.as_view(), name='host-villa-list'),
+    path('villas/<int:pk>/', HostVillaDetailView.as_view(), name='host-villa-detail'),
     # Reservations (spec: /host/reservations/)
     path('reservations/', HostBookingListView.as_view(), name='host-reservation-list'),
     path('reservations/<int:pk>/', HostBookingDetailView.as_view(), name='host-reservation-detail'),
@@ -26,6 +29,13 @@ urlpatterns = [
     path('reservations/<int:pk>/decline/', HostBookingDeclineView.as_view(), name='host-reservation-decline'),
     path('reservations/<int:pk>/check-in/', HostCheckinView.as_view(), name='host-reservation-checkin'),
     path('reservations/<int:pk>/check-out/', HostCheckoutView.as_view(), name='host-reservation-checkout'),
+    # Bookings — alias used by host frontend (same views, different URL prefix)
+    path('bookings/', HostBookingListView.as_view(), name='host-booking-list'),
+    path('bookings/<int:pk>/', HostBookingDetailView.as_view(), name='host-booking-detail'),
+    path('bookings/<int:pk>/approve/', HostBookingApproveView.as_view(), name='host-booking-approve'),
+    path('bookings/<int:pk>/decline/', HostBookingDeclineView.as_view(), name='host-booking-decline'),
+    path('bookings/<int:pk>/check-in/', HostCheckinView.as_view(), name='host-booking-checkin'),
+    path('bookings/<int:pk>/check-out/', HostCheckoutView.as_view(), name='host-booking-checkout'),
     # Calendar
     path('calendar/', HostCalendarView.as_view(), name='host-calendar'),
     path('calendar/block/', HostCalendarBlockView.as_view(), name='host-calendar-block'),

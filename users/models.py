@@ -43,6 +43,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         choices=[('zh', 'Chinese'), ('en', 'English')],
         default='zh',
     )
+    preferred_language = models.CharField(
+        max_length=2,
+        choices=[('zh', 'Chinese'), ('en', 'English'), ('id', 'Indonesian')],
+        default='en',
+        help_text='Preferred language for UI and message translations',
+    )
     # e.g. ['guest', 'host', 'admin']
     roles = models.JSONField(default=list)
     wechat_openid = models.CharField(max_length=200, null=True, blank=True, unique=True)

@@ -1,9 +1,11 @@
+import random
+from datetime import date, timedelta
 from decimal import Decimal
 from urllib.parse import quote
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from users.models import HostProfile
-from villas.models import Villa, VillaPhoto, VillaAmenity
+from villas.models import Villa, VillaPhoto, VillaAmenity, Availability, Wishlist
 from bookings.models import Booking
 from reviews.models import Review
 from payments.models import Payment
@@ -508,10 +510,18 @@ class Command(BaseCommand):
         self.stdout.write('Seeding conversations...')
         self._seed_conversations(villas, hosts, guest_map['李明'])
 
+        self.stdout.write('Seeding availability...')
+        self._seed_availability(villas)
+
+        self.stdout.write('Seeding wishlists...')
+        self._seed_wishlists(villas, guest_map)
+
         self.stdout.write(self.style.SUCCESS(
             f'Done — {len(villas)} villas, {len(hosts)} hosts, '
             f'{Review.objects.count()} reviews, {Booking.objects.count()} bookings, '
-            f'{Conversation.objects.count()} conversations'
+            f'{Conversation.objects.count()} conversations, '
+            f'{Availability.objects.count()} availability rows, '
+            f'{Wishlist.objects.count()} wishlist entries'
         ))
 
     def _clear(self):
@@ -520,6 +530,7 @@ class Command(BaseCommand):
         Conversation.objects.all().delete()
         Payment.objects.all().delete()
         Booking.objects.all().delete()
+        Availability.objects.all().delete()
         Villa.objects.all().delete()        # cascades photos, amenities, wishlists
         HostProfile.objects.all().delete()
         User.objects.filter(is_superuser=False).delete()
@@ -534,6 +545,7 @@ class Command(BaseCommand):
                     'last_name': d['last_name'],
                     'avatar_url': d['avatar'],
                     'locale': 'en',
+                    'preferred_language': 'id',
                     'roles': ['host'],
                     'is_active': True,
                     'email_verified': True,
@@ -564,13 +576,15 @@ class Command(BaseCommand):
         guest_map = {}
         for name, slug, bg in GUEST_REVIEWERS:
             email = f'{slug}@demo.balivilla.dev'
+            is_zh = any('一' <= c <= '鿿' for c in name)
             user, _ = User.objects.get_or_create(
                 email=email,
                 defaults={
                     'first_name': name.split()[0],
                     'last_name': name.split()[-1] if ' ' in name else '',
                     'avatar_url': av(name, bg),
-                    'locale': 'zh' if any('一' <= c <= '鿿' for c in name) else 'en',
+                    'locale': 'zh' if is_zh else 'en',
+                    'preferred_language': 'zh' if is_zh else 'en',
                     'roles': ['guest'],
                     'is_active': True,
                     'email_verified': True,
@@ -641,7 +655,7 @@ class Command(BaseCommand):
                 total_idr=Decimal(d['totalIdr']),
                 base_price_cny=Decimal(d['totalCny']),
                 total_cny=Decimal(d['totalCny']),
-                payout_idr=Decimal(d['totalIdr']) * Decimal('0.86'),
+                payout_idr=Decimal(d['totalIdr']) * Decimal('0.88'),
                 status=d['status'],
                 cancelled_at=cancelled_at,
                 cancellation_reason=d.get('cancellationReason', ''),
@@ -722,11 +736,16 @@ class Command(BaseCommand):
                     orig, orig_lang = m['textEn'], 'en'
                     trans = m['textZh'] if m['translated'] else ''
                     trans_lang = 'zh' if m['translated'] else ''
+                # Build translations dict from seed's pre-written bilingual text
+                translations = {orig_lang: orig}
+                if trans:
+                    translations[trans_lang] = trans
                 Message.objects.create(
                     conversation=conv,
                     sender=sender,
                     body_original=orig,
                     body_original_lang=orig_lang,
+                    translations=translations,
                     body_translated=trans,
                     body_translated_lang=trans_lang,
                 )
@@ -735,3 +754,43 @@ class Command(BaseCommand):
             preview = last['textZh'] if last['sender'] == 'guest' else last['textEn']
             conv.last_message_preview = preview[:299]
             conv.save()
+
+    def _seed_availability(self, villa_map: dict):
+        """90 days of availability for every villa with realistic blocked dates and weekend pricing."""
+        rng = random.Random(42)  # fixed seed → reproducible results
+        today = date.today()
+        bulk = []
+        for villa in villa_map.values():
+            weekend_premium = Decimal(str(villa.weekend_premium_pct)) / Decimal('100')
+            for offset in range(90):
+                d = today + timedelta(days=offset)
+                # ~18% of dates blocked (simulates existing bookings / owner blocks)
+                if rng.random() < 0.18:
+                    bulk.append(Availability(villa=villa, date=d, status=Availability.STATUS_BLOCKED))
+                    continue
+                # Weekend premium price override
+                is_weekend = d.weekday() in (4, 5)  # Fri, Sat
+                price_override = None
+                if is_weekend and weekend_premium:
+                    price_override = (villa.base_price_idr * (1 + weekend_premium)).quantize(Decimal('1000'))
+                # 3% of weekdays get a "holiday" price bump
+                elif d.weekday() not in (4, 5) and rng.random() < 0.03:
+                    price_override = (villa.base_price_idr * Decimal('1.30')).quantize(Decimal('1000'))
+                bulk.append(Availability(
+                    villa=villa,
+                    date=d,
+                    status=Availability.STATUS_AVAILABLE,
+                    price_override_idr=price_override,
+                ))
+        Availability.objects.bulk_create(bulk, ignore_conflicts=True)
+
+    def _seed_wishlists(self, villa_map: dict, guest_map: dict):
+        """Give each guest 2-3 random villas on their wishlist."""
+        rng = random.Random(99)
+        villa_list = list(villa_map.values())
+        bulk = []
+        for guest in guest_map.values():
+            picks = rng.sample(villa_list, min(3, len(villa_list)))
+            for villa in picks:
+                bulk.append(Wishlist(user=guest, villa=villa))
+        Wishlist.objects.bulk_create(bulk, ignore_conflicts=True)

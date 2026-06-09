@@ -11,7 +11,7 @@ from users.models import HostProfile
 from users.permissions import HasHostRole
 from services.translation import translate
 from .models import Villa, VillaPhoto, VillaAmenity, Availability
-from .serializers import VillaSerializer
+from .serializers import HostVillaSerializer
 
 
 def _auto_translate_villa(villa: Villa) -> None:
@@ -63,7 +63,7 @@ class HostVillaListView(APIView):
             .select_related('host__user')
             .prefetch_related('photos', 'amenities')
         )
-        return Response({'villas': VillaSerializer(villas, many=True).data})
+        return Response({'villas': HostVillaSerializer(villas, many=True).data})
 
     def post(self, request):
         host = self._get_host(request.user)
@@ -151,7 +151,7 @@ class HostVillaListView(APIView):
             .prefetch_related('photos', 'amenities')
             .get(pk=villa.pk)
         )
-        return Response({'villa': VillaSerializer(villa_full).data}, status=status.HTTP_201_CREATED)
+        return Response({'villa': HostVillaSerializer(villa_full).data}, status=status.HTTP_201_CREATED)
 
 
 class HostVillaDetailView(APIView):
@@ -171,7 +171,7 @@ class HostVillaDetailView(APIView):
         villa, err = self._get_villa(request, pk)
         if err:
             return err
-        return Response({'villa': VillaSerializer(villa).data})
+        return Response({'villa': HostVillaSerializer(villa).data})
 
     def patch(self, request, pk):
         villa, err = self._get_villa(request, pk)
@@ -201,7 +201,7 @@ class HostVillaDetailView(APIView):
             villa.save(update_fields=update_fields)
         villa.refresh_from_db()
         villa_full = Villa.objects.select_related('host__user').prefetch_related('photos', 'amenities').get(pk=villa.pk)
-        return Response({'villa': VillaSerializer(villa_full).data})
+        return Response({'villa': HostVillaSerializer(villa_full).data})
 
 
 # ─── calendar helpers ─────────────────────────────────────────────────────────

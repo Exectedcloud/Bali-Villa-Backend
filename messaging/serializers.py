@@ -48,24 +48,53 @@ class MessageSerializer(serializers.ModelSerializer):
         source='translation_confidence', max_digits=4, decimal_places=3,
         allow_null=True, read_only=True,
     )
+    translations = serializers.JSONField(read_only=True)
+    bodyOriginalLang = serializers.CharField(source='body_original_lang', read_only=True)
+    preferredText = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'textZh', 'textEn', 'sentAt', 'translated', 'readAt', 'translationConfidence']
+        fields = [
+            'id', 'sender', 'textZh', 'textEn', 'sentAt', 'translated',
+            'readAt', 'translationConfidence',
+            'translations', 'bodyOriginalLang', 'preferredText',
+        ]
 
     def get_sender(self, obj):
         conv = self.context['conversation']
         return 'guest' if obj.sender_id == conv.guest_id else 'host'
 
     def get_textZh(self, obj):
+        t = obj.translations or {}
+        if t.get('zh'):
+            return t['zh']
         if obj.body_original_lang == 'zh':
             return obj.body_original
         return obj.body_translated or ''
 
     def get_textEn(self, obj):
+        t = obj.translations or {}
+        if t.get('en'):
+            return t['en']
         if obj.body_original_lang == 'en':
             return obj.body_original
         return obj.body_translated or ''
 
     def get_translated(self, obj):
-        return bool(obj.body_translated)
+        return bool(obj.translations or obj.body_translated)
+
+    def get_preferredText(self, obj):
+        request = self.context.get('request')
+        lang = 'en'
+        if request and hasattr(request, 'user') and request.user.is_authenticated:
+            lang = getattr(request.user, 'preferred_language', None) or 'en'
+
+        t = obj.translations or {}
+        if t.get(lang):
+            return t[lang]
+        # Fall back through legacy fields
+        if lang == obj.body_original_lang:
+            return obj.body_original
+        if obj.body_translated and obj.body_translated_lang == lang:
+            return obj.body_translated
+        return obj.body_original

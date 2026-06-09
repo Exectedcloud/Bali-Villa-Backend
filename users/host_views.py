@@ -2,6 +2,7 @@ import logging
 import secrets
 
 from django.contrib.auth import get_user_model, authenticate
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 from rest_framework import status
@@ -81,7 +82,7 @@ class HostSignupView(APIView):
             user.email_verification_token = secrets.token_urlsafe(32)
             user.save(update_fields=['email_verification_token'])
             try:
-                send_verification_email(user)
+                send_verification_email(user, base_url=settings.HOST_URL)
             except Exception:
                 logger.exception('Failed to send verification email to %s', user.email)
 

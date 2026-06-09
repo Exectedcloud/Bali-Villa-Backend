@@ -47,7 +47,8 @@ class Conversation(models.Model):
 class Message(models.Model):
     LANG_ZH = 'zh'
     LANG_EN = 'en'
-    LANG_CHOICES = [(LANG_ZH, 'Chinese'), (LANG_EN, 'English')]
+    LANG_ID = 'id'
+    LANG_CHOICES = [(LANG_ZH, 'Chinese'), (LANG_EN, 'English'), (LANG_ID, 'Indonesian')]
 
     conversation = models.ForeignKey(
         Conversation,
@@ -62,7 +63,10 @@ class Message(models.Model):
     # Original text as typed by the sender
     body_original = models.TextField()
     body_original_lang = models.CharField(max_length=5, choices=LANG_CHOICES, default=LANG_ZH)
-    # DeepL translation — filled async by Celery within ~1 second of send
+    # Multi-language translations dict: { 'zh': '...', 'en': '...', 'id': '...' }
+    # Populated on send; source_lang entry = original text unchanged.
+    translations = models.JSONField(default=dict)
+    # Legacy single-translation fields — kept for backward compat; mirrors translations[other_lang]
     body_translated = models.TextField(blank=True)
     body_translated_lang = models.CharField(max_length=5, choices=LANG_CHOICES, blank=True)
     # Optional attachment (Cloudflare R2 URL)

@@ -35,6 +35,7 @@ class BookingSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source='created_at')
     cancelledAt = serializers.SerializerMethodField()
     cancellationReason = serializers.SerializerMethodField()
+    reviewId = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -42,7 +43,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'id', 'reference', 'villaId', 'villa', 'status', 'checkIn', 'checkOut', 'nights',
             'adults', 'children', 'infants', 'guestNote',
             'totalCny', 'totalIdr', 'paymentMethod', 'paidAt',
-            'createdAt', 'cancelledAt', 'cancellationReason',
+            'createdAt', 'cancelledAt', 'cancellationReason', 'reviewId',
         ]
 
     _METHOD_MAP = {
@@ -80,3 +81,9 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_cancellationReason(self, obj):
         return obj.cancellation_reason or None
+
+    def get_reviewId(self, obj):
+        try:
+            return obj.review.id
+        except Exception:
+            return None
