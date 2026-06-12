@@ -69,6 +69,42 @@ class HostConversationListView(APIView):
         )
         return Response({'conversations': HostConversationSerializer(convs, many=True).data})
 
+    def post(self, request):
+        """Create or retrieve a conversation for a specific booking."""
+        host = self._get_host(request.user)
+        if not host:
+            return Response({'error': 'Not a host account.'}, status=status.HTTP_403_FORBIDDEN)
+
+        booking_id = request.data.get('bookingId')
+        if not booking_id:
+            return Response({'error': 'bookingId required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from bookings.models import Booking
+            booking = Booking.objects.select_related('guest', 'villa').get(
+                pk=booking_id, villa__host=host
+            )
+        except Booking.DoesNotExist:
+            return Response({'error': 'Booking not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        conv, created = Conversation.objects.get_or_create(
+            guest=booking.guest,
+            host=host,
+            villa=booking.villa,
+        )
+
+        conv_full = (
+            Conversation.objects
+            .select_related('villa', 'guest')
+            .prefetch_related('villa__photos')
+            .get(pk=conv.pk)
+        )
+        resp_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(
+            {'conversation': HostConversationSerializer(conv_full).data},
+            status=resp_status,
+        )
+
 
 class HostMessageListView(APIView):
     permission_classes = [HasHostRole]
